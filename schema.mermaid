@@ -1,20 +1,21 @@
 erDiagram
 
     %% ==========================================
-    %% 1. 使用者與權限模組 (EER Specialization)
+    %% 1. 使用者與權限模組
     %% ==========================================
     USER {
         int user_id PK
         varchar username
         varchar email
         varchar password_hash
-        enum role "Guest/User/Creator/CSR/Admin"
+        enum role "User/CSR/Admin" 
         datetime registration_date
         enum status "active/locked/banned"
     }
 
+    %% GUEST 獨立為 Session 追蹤，不再繼承 USER
     GUEST {
-        int user_id PK,FK "繼承自 USER"
+        varchar session_id PK
         varchar last_visit_ip
     }
 
@@ -38,10 +39,10 @@ erDiagram
     }
 
     COMMUNITY_GROUP {
-        int group_id PK,FK "繼承自 USER"
+        int group_id PK
         varchar group_name
         varchar tax_id
-        varchar bank_account
+        decimal wallet_balance "替換 bank_account，改為錢包餘額制"
         varchar contact_email
     }
 
@@ -271,93 +272,68 @@ erDiagram
     }
 
     %% ==========================================
-    %% 5. 關係定義 (依據 6.2 節的 29 條核心關係)
+    %% 5. 關係定義
     %% ==========================================
 
-    %% 繼承關係 (EER Subclasses)
-    USER ||--o| GUEST : "is a"
+    %% 繼承關係 (EER Subclasses) - GUEST 已被移除繼承
     USER ||--o| MEMBER : "is a"
     USER ||--o| CSR : "is a"
     USER ||--o| ADMIN : "is a"
-    USER ||--o| COMMUNITY_GROUP : "is a"
 
-    %% 依據表格之關聯
-    %% 1. USER - TRANSACTION (1:N 單線-雙線)
+    COMMUNITY_GROUP ||--o{ GROUP_PERMISSION : "managed by"
+    USER ||--o{ GROUP_PERMISSION : "manages"
+
     USER ||--o{ TRANSACTION : "makes"
-    %% 2. TRANS - TRANS_ITEM (1:N 雙線-雙線)
     TRANSACTION ||--|{ TRANSACTION_ITEM : "contains"
-    %% 3. TRANS_ITEM - GAME_LICENSE (1:1 單線-雙線)
     TRANSACTION_ITEM ||--o| GAME_LICENSE : "grants"
-    %% 4. USER - GAME_LICENSE (M:N -> 轉為 1:N 單線-雙線 依賴授權實體)
     USER ||--o{ GAME_LICENSE : "owns"
     GAME ||--o{ GAME_LICENSE : "licensed to"
     
-    %% 5. & 6. COMM_GROUP - GAME 開發與發行 (1:N 單線-雙線)
     COMMUNITY_GROUP ||--o{ GAME : "develops"
     COMMUNITY_GROUP ||--o{ GAME : "publishes"
     
-    %% 7. GAME - TAG (M:N 單線-單線)
     GAME ||--o{ GAME_TAG : "has"
     TAG ||--o{ GAME_TAG : "applied to"
     
-    %% 8. GAME - GAME_MEDIA (1:N 單線-雙線)
     GAME ||--o{ GAME_MEDIA : "has"
     
-    %% 9. & 10. REVIEW (1:N 單線-雙線)
     USER ||--o{ REVIEW : "writes"
     GAME ||--o{ REVIEW : "reviewed by"
     
-    %% 11. & 12. ACHIEVEMENT (1:N 單線-雙線)
     GAME ||--o{ ACHIEVEMENT : "defines"
     USER ||--o{ USER_ACHIEVEMENT : "unlocks"
     ACHIEVEMENT ||--o{ USER_ACHIEVEMENT : "achieved by"
     
-    %% 13. & 14. SAVE_DATA & PLAY_SESSION (1:N 單線-雙線)
     USER ||--o{ SAVE_DATA : "saves"
     GAME ||--o{ SAVE_DATA : "save for"
     USER ||--o{ PLAY_SESSION : "plays"
     GAME ||--o{ PLAY_SESSION : "played"
     
-    %% 15. & 16. DISCUSSION_POST (1:N 單線-雙線)
     DISCUSSION_POST ||--o{ DISCUSSION_POST : "replies to"
     USER ||--o{ DISCUSSION_POST : "posts"
     GAME ||--o{ DISCUSSION_POST : "discussed in"
     
-    %% 17. 18. 19. 社交遞迴關係 (M:N 單線-雙線)
     USER ||--o{ MESSAGE : "sends/receives msg"
     USER ||--o{ FRIENDSHIP : "friends with"
     USER ||--o{ BLACKLIST : "blocks"
     
-    %% 20. USER - GROUP_PERMISSION (M:N 單線-雙線)
-    COMMUNITY_GROUP ||--o{ GROUP_PERMISSION : "grants"
-    USER ||--o{ GROUP_PERMISSION : "receives"
-    
-    %% 21. USER - WISH_LIST (M:N 單線-雙線)
     USER ||--o{ WISH_LIST : "wishes"
     GAME ||--o{ WISH_LIST : "wished"
     
-    %% 22. USER - SHOPPING_CART (1:1 雙線-雙線，符合「全參與」約束)
     USER ||--|| SHOPPING_CART : "owns cart"
     GAME ||--o{ SHOPPING_CART : "in cart"
     
-    %% 23. USER - NOTIFICATION (1:N 單線-雙線)
     USER ||--o{ NOTIFICATION : "notified"
     
-    %% 24. USER - USER_PREFERENCE (1:1 雙線-雙線)
     USER ||--|| USER_PREFERENCE : "configures"
     
-    %% 25. & 26. 客服檢舉與退款 (1:N 單線-雙線)
     USER ||--o{ REFUND_REQUEST : "submits"
     TRANSACTION_ITEM ||--o| REFUND_REQUEST : "refunded"
     USER ||--o{ REPORT : "reports"
     REVIEW ||--o{ REPORT : "reported"
     
-    %% 27. & 28. 商店營銷與更新 (1:N 單線-雙線)
     GAME ||--o{ DISCOUNT : "discounted"
     GAME ||--o{ GAME_UPDATE : "updated"
     
-    %% 29. ADMIN - SALE_EVENT (1:N 單線-雙線)
     ADMIN ||--o{ SALE_EVENT : "manages"
-    
-    %% 補充：全局參數異動
     ADMIN ||--o{ PLATFORM_PARAMETER : "sets"
