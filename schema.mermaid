@@ -1,0 +1,363 @@
+erDiagram
+
+    %% ==========================================
+    %% 1. 使用者與權限模組 (EER Specialization)
+    %% ==========================================
+    USER {
+        int user_id PK
+        varchar username
+        varchar email
+        varchar password_hash
+        enum role "Guest/User/Creator/CSR/Admin"
+        datetime registration_date
+        enum status "active/locked/banned"
+    }
+
+    GUEST {
+        int user_id PK,FK "繼承自 USER"
+        varchar last_visit_ip
+    }
+
+    MEMBER {
+        int user_id PK,FK "繼承自 USER"
+        varchar nickname
+        decimal wallet_balance
+        int member_level
+    }
+
+    CSR {
+        int user_id PK,FK "繼承自 USER"
+        varchar employee_id
+        varchar department
+    }
+
+    ADMIN {
+        int user_id PK,FK "繼承自 USER"
+        int admin_level
+        datetime last_login
+    }
+
+    COMMUNITY_GROUP {
+        int user_id PK,FK "繼承自 USER"
+        varchar group_name
+        varchar tax_id
+        varchar bank_account
+        varchar contact_email
+    }
+
+    GROUP_PERMISSION {
+        int group_id FK
+        int user_id FK
+        varchar permission_type
+    }
+
+    USER_PREFERENCE {
+        int preference_id PK
+        int user_id FK
+        boolean xbox_controller_mode
+        boolean high_contrast_mode
+        boolean colorblind_mode
+        text other_settings_json
+    }
+
+    %% ==========================================
+    %% 2. 商店與遊戲模組
+    %% ==========================================
+    GAME {
+        int game_id PK
+        varchar title
+        decimal base_price
+        decimal overall_rating
+        int developer_id FK "參考 COMMUNITY_GROUP"
+        int publisher_id FK "參考 COMMUNITY_GROUP"
+    }
+
+    GAME_MEDIA {
+        int media_id PK
+        int game_id FK
+        varchar file_url
+    }
+
+    TAG {
+        int tag_id PK
+        varchar tag_name
+    }
+
+    GAME_TAG {
+        int game_id FK
+        int tag_id FK
+    }
+
+    GAME_UPDATE {
+        int update_id PK
+        int game_id FK
+        varchar version_no
+    }
+
+    DISCOUNT {
+        int discount_id PK
+        int game_id FK
+        decimal percent
+    }
+
+    %% ==========================================
+    %% 3. 訂單、授權與遊戲庫模組
+    %% ==========================================
+    SHOPPING_CART {
+        int cart_id PK
+        int user_id FK
+        int game_id FK
+        datetime added_at
+    }
+
+    WISH_LIST {
+        int wishlist_id PK
+        int user_id FK
+        int game_id FK
+        datetime added_at
+    }
+
+    TRANSACTION {
+        int transaction_id PK
+        int user_id FK
+        decimal total_amount
+        varchar payment_method
+        datetime transaction_date
+        varchar receipt_number
+    }
+
+    TRANSACTION_ITEM {
+        int item_id PK
+        int transaction_id FK
+        int game_id FK
+        decimal purchase_price
+        decimal discount_applied
+    }
+
+    GAME_LICENSE {
+        int license_id PK
+        int user_id FK
+        int game_id FK
+        int transaction_item_id FK
+        datetime acquired_date
+        enum status "active/revoked/frozen"
+    }
+
+    PLAY_SESSION {
+        int session_id PK
+        int user_id FK
+        int game_id FK
+        datetime start_time
+        datetime end_time
+        int duration_minutes
+    }
+
+    ACHIEVEMENT {
+        int achievement_id PK
+        int game_id FK
+        varchar achievement_name
+        text description
+        varchar icon_url
+    }
+
+    USER_ACHIEVEMENT {
+        int user_id FK
+        int achievement_id FK
+        datetime unlocked_at
+    }
+
+    SAVE_DATA {
+        int save_id PK
+        int user_id FK
+        int game_id FK
+        varchar file_url
+        datetime synced_at
+    }
+
+    %% ==========================================
+    %% 4. 社群、客服與營運模組
+    %% ==========================================
+    REVIEW {
+        int review_id PK
+        int user_id FK
+        int game_id FK
+        enum recommendation "positive/negative"
+        text content
+        datetime created_at
+        enum status "visible/hidden/deleted"
+    }
+
+    DISCUSSION_POST {
+        int post_id PK
+        int game_id FK
+        int user_id FK
+        varchar title
+        text content
+        datetime created_at
+        int parent_post_id FK
+    }
+
+    FRIENDSHIP {
+        int friendship_id PK
+        int sender_id FK
+        int receiver_id FK
+        enum status "pending/accepted/declined"
+        datetime created_at
+    }
+
+    MESSAGE {
+        int message_id PK
+        int sender_id FK
+        int receiver_id FK
+        text content
+        datetime sent_at
+        boolean is_read
+    }
+
+    BLACKLIST {
+        int blacklist_id PK
+        int blocker_id FK
+        int blocked_id FK
+        datetime created_at
+    }
+
+    NOTIFICATION {
+        int notification_id PK
+        int user_id FK
+        enum type "wishlist_sale/friend_online/achievement/update/refund/warning"
+        text content
+        boolean is_read
+        datetime created_at
+    }
+
+    REFUND_REQUEST {
+        int refund_id PK
+        int transaction_item_id FK
+        int user_id FK
+        text reason
+        enum status "pending/approved/rejected"
+        int handled_by FK
+        text reject_reason
+        datetime created_at
+        datetime resolved_at
+    }
+
+    REPORT {
+        int report_id PK
+        int reporter_id FK
+        int review_id FK
+        text reason
+        enum status "pending/resolved"
+        int handled_by FK
+        enum action_taken "delete/keep"
+        datetime created_at
+    }
+
+    PLATFORM_PARAMETER {
+        int param_id PK
+        varchar param_key
+        varchar param_value
+        int updated_by FK
+        datetime updated_at
+    }
+
+    SALE_EVENT {
+        int event_id PK
+        int admin_id FK
+        varchar event_name
+        datetime start_date
+        datetime end_date
+        enum status "scheduled/active/ended"
+    }
+
+    %% ==========================================
+    %% 5. 關係定義 (依據 6.2 節的 29 條核心關係)
+    %% ==========================================
+
+    %% 繼承關係 (EER Subclasses)
+    USER ||--o| GUEST : "is a"
+    USER ||--o| MEMBER : "is a"
+    USER ||--o| CSR : "is a"
+    USER ||--o| ADMIN : "is a"
+    USER ||--o| COMMUNITY_GROUP : "is a"
+
+    %% 依據 6.2 表格之關聯
+    %% 1. USER - TRANSACTION (1:N 單線-雙線)
+    USER ||--o{ TRANSACTION : "makes"
+    %% 2. TRANS - TRANS_ITEM (1:N 雙線-雙線)
+    TRANSACTION ||--|{ TRANSACTION_ITEM : "contains"
+    %% 3. TRANS_ITEM - GAME_LICENSE (1:1 單線-雙線)
+    TRANSACTION_ITEM ||--o| GAME_LICENSE : "grants"
+    %% 4. USER - GAME_LICENSE (M:N -> 轉為 1:N 單線-雙線 依賴授權實體)
+    USER ||--o{ GAME_LICENSE : "owns"
+    GAME ||--o{ GAME_LICENSE : "licensed to"
+    
+    %% 5. & 6. COMM_GROUP - GAME 開發與發行 (1:N 單線-雙線)
+    COMMUNITY_GROUP ||--o{ GAME : "develops"
+    COMMUNITY_GROUP ||--o{ GAME : "publishes"
+    
+    %% 7. GAME - TAG (M:N 單線-單線)
+    GAME ||--o{ GAME_TAG : "has"
+    TAG ||--o{ GAME_TAG : "applied to"
+    
+    %% 8. GAME - GAME_MEDIA (1:N 單線-雙線)
+    GAME ||--o{ GAME_MEDIA : "has"
+    
+    %% 9. & 10. REVIEW (1:N 單線-雙線)
+    USER ||--o{ REVIEW : "writes"
+    GAME ||--o{ REVIEW : "reviewed by"
+    
+    %% 11. & 12. ACHIEVEMENT (1:N 單線-雙線)
+    GAME ||--o{ ACHIEVEMENT : "defines"
+    USER ||--o{ USER_ACHIEVEMENT : "unlocks"
+    ACHIEVEMENT ||--o{ USER_ACHIEVEMENT : "achieved by"
+    
+    %% 13. & 14. SAVE_DATA & PLAY_SESSION (1:N 單線-雙線)
+    USER ||--o{ SAVE_DATA : "saves"
+    GAME ||--o{ SAVE_DATA : "save for"
+    USER ||--o{ PLAY_SESSION : "plays"
+    GAME ||--o{ PLAY_SESSION : "played"
+    
+    %% 15. & 16. DISCUSSION_POST (1:N 單線-雙線)
+    DISCUSSION_POST ||--o{ DISCUSSION_POST : "replies to"
+    USER ||--o{ DISCUSSION_POST : "posts"
+    GAME ||--o{ DISCUSSION_POST : "discussed in"
+    
+    %% 17. 18. 19. 社交遞迴關係 (M:N 單線-雙線)
+    USER ||--o{ MESSAGE : "sends/receives msg"
+    USER ||--o{ FRIENDSHIP : "friends with"
+    USER ||--o{ BLACKLIST : "blocks"
+    
+    %% 20. USER - GROUP_PERMISSION (M:N 單線-雙線)
+    COMMUNITY_GROUP ||--o{ GROUP_PERMISSION : "grants"
+    USER ||--o{ GROUP_PERMISSION : "receives"
+    
+    %% 21. USER - WISH_LIST (M:N 單線-雙線)
+    USER ||--o{ WISH_LIST : "wishes"
+    GAME ||--o{ WISH_LIST : "wished"
+    
+    %% 22. USER - SHOPPING_CART (M:N 雙線-雙線)
+    USER ||--|{ SHOPPING_CART : "adds to cart"
+    GAME ||--o{ SHOPPING_CART : "in cart"
+    
+    %% 23. USER - NOTIFICATION (1:N 單線-雙線)
+    USER ||--o{ NOTIFICATION : "notified"
+    
+    %% 24. USER - USER_PREFERENCE (1:1 雙線-雙線)
+    USER ||--|| USER_PREFERENCE : "configures"
+    
+    %% 25. & 26. 客服檢舉與退款 (1:N 單線-雙線)
+    USER ||--o{ REFUND_REQUEST : "submits"
+    TRANSACTION_ITEM ||--o| REFUND_REQUEST : "refunded"
+    USER ||--o{ REPORT : "reports"
+    REVIEW ||--o{ REPORT : "reported"
+    
+    %% 27. & 28. 商店營銷與更新 (1:N 單線-雙線)
+    GAME ||--o{ DISCOUNT : "discounted"
+    GAME ||--o{ GAME_UPDATE : "updated"
+    
+    %% 29. ADMIN - SALE_EVENT (1:N 單線-雙線)
+    ADMIN ||--o{ SALE_EVENT : "manages"
+    
+    %% 補充：全局參數異動
+    ADMIN ||--o{ PLATFORM_PARAMETER : "sets"
