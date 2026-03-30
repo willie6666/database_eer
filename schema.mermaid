@@ -38,7 +38,7 @@ erDiagram
     }
 
     COMMUNITY_GROUP {
-        int user_id PK,FK "繼承自 USER"
+        int group_id PK,FK "繼承自 USER"
         varchar group_name
         varchar tax_id
         varchar bank_account
@@ -46,8 +46,8 @@ erDiagram
     }
 
     GROUP_PERMISSION {
-        int group_id FK
-        int user_id FK
+        int group_id PK,FK
+        int user_id PK,FK
         varchar permission_type
     }
 
@@ -84,8 +84,8 @@ erDiagram
     }
 
     GAME_TAG {
-        int game_id FK
-        int tag_id FK
+        int game_id PK,FK
+        int tag_id PK,FK
     }
 
     GAME_UPDATE {
@@ -161,8 +161,8 @@ erDiagram
     }
 
     USER_ACHIEVEMENT {
-        int user_id FK
-        int achievement_id FK
+        int user_id PK,FK
+        int achievement_id PK,FK
         datetime unlocked_at
     }
 
@@ -281,7 +281,7 @@ erDiagram
     USER ||--o| ADMIN : "is a"
     USER ||--o| COMMUNITY_GROUP : "is a"
 
-    %% 依據 6.2 表格之關聯
+    %% 依據表格之關聯
     %% 1. USER - TRANSACTION (1:N 單線-雙線)
     USER ||--o{ TRANSACTION : "makes"
     %% 2. TRANS - TRANS_ITEM (1:N 雙線-雙線)
@@ -336,8 +336,8 @@ erDiagram
     USER ||--o{ WISH_LIST : "wishes"
     GAME ||--o{ WISH_LIST : "wished"
     
-    %% 22. USER - SHOPPING_CART (M:N 雙線-雙線)
-    USER ||--|{ SHOPPING_CART : "adds to cart"
+    %% 22. USER - SHOPPING_CART (1:1 雙線-雙線，符合「全參與」約束)
+    USER ||--|| SHOPPING_CART : "owns cart"
     GAME ||--o{ SHOPPING_CART : "in cart"
     
     %% 23. USER - NOTIFICATION (1:N 單線-雙線)
