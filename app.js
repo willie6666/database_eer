@@ -81,17 +81,53 @@ function parseMermaidER(code) {
         }
     }
 
+    const isSpecializationLabel = (label) => {
+        const normalized = (label || '').toLowerCase();
+        return normalized === 'is a' || normalized.startsWith('is a ');
+    };
+
+    const specializations = {};
+    const normalRelationships = [];
+
+    relationships.forEach(rel => {
+        if (isSpecializationLabel(rel.label)) {
+            const parent = rel.source;
+            if (!specializations[parent]) {
+                specializations[parent] = {
+                    parent,
+                    children: [],
+                    constraint: '',
+                    total: true
+                };
+            }
+
+            const dMatch = rel.label.match(/\((d|o)\)/i) || rel.label.match(/\b(d|o)\b/i);
+            if (dMatch) {
+                specializations[parent].constraint = dMatch[1].toLowerCase();
+            }
+            specializations[parent].children.push(rel.target);
+            specializations[parent].total = specializations[parent].total && rel.srcMandatory;
+            return;
+        }
+
+        normalRelationships.push(rel);
+    });
+
     // Detect weak entities: has attributes but none is PK
     Object.values(entities).forEach(ent => {
         ent.isWeak = ent.attributes.length > 0 && !ent.attributes.some(a => a.isPK);
     });
 
     // Detect identifying relationships: connected to at least one weak entity
-    relationships.forEach(rel => {
+    normalRelationships.forEach(rel => {
         rel.isIdentifying = !!(entities[rel.source]?.isWeak || entities[rel.target]?.isWeak);
     });
 
-    return { entities: Object.values(entities), relationships };
+    return {
+        entities: Object.values(entities),
+        relationships: normalRelationships,
+        specializations: Object.values(specializations)
+    };
 }
 
 // ==========================================================
@@ -105,7 +141,7 @@ function renderDiagram(parsed) {
     svg.selectAll('g.root').remove();
     if (simulation) simulation.stop();
 
-    const { entities, relationships } = parsed;
+    const { entities, relationships, specializations = [] } = parsed;
     const nodesData = [];
     const linksData = [];
     const nodeMap = {};
@@ -147,8 +183,41 @@ function renderDiagram(parsed) {
         }
     });
 
+    // Specialization (ISA) nodes + links
+    specializations.forEach((spec, idx) => {
+        const specId = `spec__${idx}__${spec.parent}`;
+        const specNode = {
+            id: specId,
+            type: 'spec',
+            label: spec.constraint || 'd',
+            total: spec.total
+        };
+        nodesData.push(specNode);
+        nodeMap[specId] = specNode;
+
+        linksData.push({
+            source: spec.parent,
+            target: specId,
+            linkType: 'spec',
+            mandatory: spec.total,
+            cardLabel: ''
+        });
+
+        spec.children.forEach(child => {
+            linksData.push({
+                source: specId,
+                target: child,
+                linkType: 'spec',
+                mandatory: true,
+                cardLabel: ''
+            });
+        });
+    });
+
+    const totalRelCount = relationships.length + specializations.reduce((sum, spec) => sum + spec.children.length, 0);
+
     document.getElementById('statEntities').textContent = entities.length;
-    document.getElementById('statRelations').textContent = relationships.length;
+    document.getElementById('statRelations').textContent = totalRelCount;
     document.getElementById('statAttrs').textContent = totalAttrs;
 
     const container = document.getElementById('canvasArea');
@@ -167,17 +236,20 @@ function renderDiagram(parsed) {
     simulation = d3.forceSimulation(nodesData)
         .force('link', d3.forceLink(linksData).id(d => d.id).distance(d => {
             if (d.linkType === 'attr') return 38;
+            if (d.linkType === 'spec') return 55;
             return 70;
         }))
         .force('charge', d3.forceManyBody().strength(d => {
             if (d.type === 'attr' || d.type === 'pk' || d.type === 'fk') return -15;
             if (d.type === 'rel') return -300;
+            if (d.type === 'spec') return -170;
             if (d.type === 'dummy') return -20;
             return -600;
         }))
         .force('collide', d3.forceCollide().radius(d => {
             if (d.type === 'attr' || d.type === 'pk' || d.type === 'fk') return 22;
             if (d.type === 'dummy') return 5;
+            if (d.type === 'spec') return 20;
             return 55;
         }))
         .force('center', d3.forceCenter(width / 2, height / 2))
@@ -204,6 +276,13 @@ function renderDiagram(parsed) {
     // Partial participation: single line
     linkGroup.filter(d => d.linkType === 'rel' && !d.mandatory).append('line')
         .attr('stroke', '#9ca3af').attr('stroke-width', 1.8).attr('opacity', 0.9);
+
+    // Specialization links
+    linkGroup.filter(d => d.linkType === 'spec' && d.mandatory).append('line')
+        .attr('stroke', '#7c3aed').attr('stroke-width', 3.2).attr('opacity', 0.95);
+
+    linkGroup.filter(d => d.linkType === 'spec' && !d.mandatory).append('line')
+        .attr('stroke', '#a78bfa').attr('stroke-width', 2.1).attr('opacity', 0.9);
 
     // Cardinality labels
     const cardLabels = linkGroup.filter(d => d.cardLabel).append('text')
@@ -273,6 +352,13 @@ function renderDiagram(parsed) {
         .attr('rx', 46).attr('ry', 16)
         .attr('fill', '#f8fafc').attr('stroke', '#94a3b8').attr('stroke-width', 1.5);
 
+    // ── Specialization constraint circle (d/o)
+    nodeGroup.filter(d => d.type === 'spec').append('circle')
+        .attr('r', 16)
+        .attr('fill', '#ede9fe')
+        .attr('stroke', '#7c3aed')
+        .attr('stroke-width', 2);
+
     nodeGroup.filter(d => d.type === 'pk').append('ellipse')
         .attr('rx', 48).attr('ry', 17)
         .attr('fill', '#eff6ff').attr('stroke', '#3b82f6').attr('stroke-width', 2);
@@ -301,6 +387,10 @@ function renderDiagram(parsed) {
     nodeGroup.filter(d => d.type === 'fk').append('text')
         .attr('class', 'attr-label fk-label')
         .text(d => d.label);
+
+    nodeGroup.filter(d => d.type === 'spec').append('text')
+        .attr('class', 'spec-label')
+        .text(d => d.label || 'd');
 
     // ── Hover interactions ───────────────────────────────────────
     const adj = {};
@@ -385,7 +475,8 @@ function doRender() {
         if (parsed.entities.length === 0) { setStatus('err', '未偵測到任何實體，請確認語法正確'); return; }
         renderDiagram(parsed);
         const weakCount = parsed.entities.filter(e => e.isWeak).length;
-        setStatus('ok', `成功渲染 ${parsed.entities.length} 個實體（${weakCount} 弱）、${parsed.relationships.length} 條關係`);
+        const specCount = (parsed.specializations || []).reduce((sum, spec) => sum + spec.children.length, 0);
+        setStatus('ok', `成功渲染 ${parsed.entities.length} 個實體（${weakCount} 弱）、${parsed.relationships.length + specCount} 條關係`);
     } catch(e) {
         setStatus('err', '解析錯誤：' + e.message);
         console.error(e);

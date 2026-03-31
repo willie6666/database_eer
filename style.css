@@ -287,6 +287,16 @@ body {
     pointer-events: none;
 }
 
+.spec-label {
+    text-anchor: middle;
+    dominant-baseline: central;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    fill: #5b21b6;
+    pointer-events: none;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
